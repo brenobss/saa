@@ -55,7 +55,7 @@ class LoginScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Sistema de Apoio à Orientação Acadêmica',
+                      'Sistema de Apoio Acadêmico',
                       style: TextStyle(color: Colors.grey, fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
