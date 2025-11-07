@@ -47,7 +47,7 @@ class LoginScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'SAOA',
+                      'SAA',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
