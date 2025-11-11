@@ -1,13 +1,8 @@
 """Pacote contendo as blueprints do backend."""
 
-from flask import Blueprint
-
-students_bp = Blueprint("students", __name__, url_prefix="/api/estudantes")
-reports_bp = Blueprint("reports", __name__, url_prefix="/api/relatorios")
-
-
-# Importa rotas para realizar o binding ao blueprint.
-from . import reports, students  # noqa: E402
+# Importa blueprints que já têm suas rotas definidas
+from .students import students_bp  # noqa: F401
+from .reports import reports_bp  # noqa: F401
 
 
 __all__ = ["students_bp", "reports_bp"]
