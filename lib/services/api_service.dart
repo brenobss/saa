@@ -15,7 +15,7 @@ class ApiService {
   ) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/login'),
+        Uri.parse('$baseUrl/estudantes/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'matricula': matricula, 'senha': senha}),
       );
