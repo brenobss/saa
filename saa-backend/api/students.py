@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 import sqlite3
 from pathlib import Path
 import bcrypt
+from werkzeug.security import check_password_hash as wz_check_password_hash
 
 # Importações de modelos
 try:
@@ -42,11 +43,37 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    """Verifica se uma senha corresponde ao hash"""
-    try:
-        return bcrypt.checkpw(password.encode(), password_hash.encode())
-    except:
+    """
+    Verifica se uma senha corresponde ao hash.
+
+    Suporta:
+    - Hashes gerados com bcrypt (usados pelo endpoint atual e pelo script reset_password.py)
+    - Hashes gerados com werkzeug.security.generate_password_hash
+    - O marcador "hash_padrao" usado por scripts antigos, aceitando a senha "senha123"
+    """
+    if not password_hash:
         return False
+
+    # 1) Tentativa com bcrypt (hashes normalmente começam com "$2")
+    try:
+        if password_hash.startswith("$2"):
+            return bcrypt.checkpw(password.encode(), password_hash.encode())
+    except Exception:
+        # Se der erro, continua para o fallback
+        pass
+
+    # 2) Fallback: hashes gerados com werkzeug (ex: "pbkdf2:sha256:...")
+    try:
+        return wz_check_password_hash(password_hash, password)
+    except Exception:
+        pass
+
+    # 3) Compatibilidade com dados populados por scripts antigos
+    if password_hash == "hash_padrao":
+        # Define uma senha padrão simples para ambiente de desenvolvimento
+        return password == "senha123"
+
+    return False
 
 
 @students_bp.route('/login', methods=['POST'])

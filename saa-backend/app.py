@@ -36,5 +36,12 @@ def create_app() -> Flask:
 
 
 if __name__ == "__main__":
-    create_app().run(debug=True)
+    # Executa o servidor em modo estável (sem debugger/reloader),
+    # para evitar problemas de sandbox/namespace no ambiente.
+    create_app().run(
+        host="0.0.0.0",
+        port=5000,
+        debug=False,
+        use_reloader=False,
+    )
 
