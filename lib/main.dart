@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:saa/login_screen.dart';
+import 'package:saa/screens/login_screen.dart';
 
 void main() {
   runApp(const SAAApp());

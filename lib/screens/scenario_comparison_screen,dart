@@ -1,0 +1,814 @@
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:saa/services/api_service.dart';
+import 'dart:math';
+
+class ScenarioComparisonScreen extends StatefulWidget {
+  final String matricula;
+
+  const ScenarioComparisonScreen({super.key, required this.matricula});
+
+  @override
+  State<ScenarioComparisonScreen> createState() =>
+      _ScenarioComparisonScreenState();
+}
+
+class _ScenarioComparisonScreenState extends State<ScenarioComparisonScreen> {
+  List<Map<String, dynamic>> scenarios = [];
+  bool isLoading = false;
+  int? selectedScenarioIndex;
+  Map<String, dynamic>? userCurrentProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPresetScenarios();
+  }
+
+  Future<void> _loadPresetScenarios() async {
+    setState(() => isLoading = true);
+
+    // Cenários baseados nos CENTROIDES REAIS da pesquisa (K-Means)
+    final presets = [
+      {
+        'nome': '😴 Pouco Engajado',
+        'descricao': 'Identificado em 22% dos estudantes',
+        'perfil_pesquisa': 'Cluster 0 - Necessita intervenção',
+        'horas_estudo': 3.0,
+        'projetos': 0,
+        'disciplinas': 1,
+        'cor': Colors.red,
+        'percentual_turma': '21,9%',
+        'insight':
+            'Estudantes deste perfil têm 3x mais risco de evasão segundo a pesquisa',
+      },
+      {
+        'nome': '🚀 Altamente Prático',
+        'descricao': 'Identificado em 41% dos estudantes',
+        'perfil_pesquisa': 'Cluster 1 - Aprende fazendo',
+        'horas_estudo': 8.0,
+        'projetos': 6,
+        'disciplinas': 2,
+        'cor': Colors.blue,
+        'percentual_turma': '40,6%',
+        'insight':
+            'Este perfil aumenta impacto em 40% ao cursar 3+ disciplinas práticas',
+      },
+      {
+        'nome': '📚 Estudioso Dedicado',
+        'descricao': 'Identificado em 38% dos estudantes',
+        'perfil_pesquisa': 'Cluster 2 - Foco teórico intenso',
+        'horas_estudo': 20.0,
+        'projetos': 2,
+        'disciplinas': 3,
+        'cor': Colors.green,
+        'percentual_turma': '37,5%',
+        'insight':
+            'Maior impacto quando combina estudo com projetos práticos',
+      },
+    ];
+
+    // Simular cada cenário
+    for (var preset in presets) {
+      final resultado = await ApiService.simularCenario(
+        horasEstudo: preset['horas_estudo'] as double,
+        projetos: preset['projetos'] as int,
+        disciplinas: preset['disciplinas'] as int,
+      );
+
+      if (resultado != null) {
+        scenarios.add({
+          ...preset,
+          'impacto_previsto': resultado['impacto_previsto'] ?? 2.0,
+          'risco': resultado['risco'] ?? 'Médio',
+          'risco_percentual': _getRiscoPercentual(resultado['risco']),
+        });
+      }
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  int _getRiscoPercentual(String? risco) {
+    switch (risco?.toLowerCase()) {
+      case 'baixo':
+        return 20;
+      case 'médio':
+      case 'medio':
+        return 50;
+      case 'alto':
+        return 80;
+      default:
+        return 50;
+    }
+  }
+
+  double _calcularDistanciaPerfil(
+    double horas,
+    int projetos,
+    int disciplinas,
+    List<double> centroide,
+  ) {
+    // Normalizar valores antes de calcular distância
+    double horasNorm = horas / 40.0;
+    double projetosNorm = projetos / 10.0;
+    double discNorm = disciplinas / 5.0;
+
+    double soma = pow(horasNorm - centroide[0] / 40.0, 2).toDouble() +
+      pow(projetosNorm - centroide[1] / 10.0, 2).toDouble() +
+      pow(discNorm - centroide[2] / 5.0, 2).toDouble();
+
+    return sqrt(soma);
+  }
+
+  Future<void> _addCustomScenario() async {
+    double horas = 10.0;
+    int projetos = 2;
+    int disciplinas = 3;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Criar Cenário Personalizado'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Horas de Estudo: ${horas.toInt()}h/semana'),
+                Slider(
+                  value: horas,
+                  min: 0,
+                  max: 40,
+                  divisions: 40,
+                  onChanged: (value) => setDialogState(() => horas = value),
+                ),
+                const SizedBox(height: 16),
+                Text('Projetos: ${projetos}'),
+                Slider(
+                  value: projetos.toDouble(),
+                  min: 0,
+                  max: 10,
+                  divisions: 10,
+                  onChanged: (value) =>
+                      setDialogState(() => projetos = value.toInt()),
+                ),
+                const SizedBox(height: 16),
+                Text('Disciplinas Práticas: $disciplinas'),
+                Slider(
+                  value: disciplinas.toDouble(),
+                  min: 1,
+                  max: 5,
+                  divisions: 4,
+                  onChanged: (value) =>
+                      setDialogState(() => disciplinas = value.toInt()),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, {
+                'horas_estudo': horas,
+                'projetos': projetos,
+                'disciplinas': disciplinas,
+              }),
+              child: const Text('Adicionar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() => isLoading = true);
+
+      final simulacao = await ApiService.simularCenario(
+        horasEstudo: result['horas_estudo'],
+        projetos: result['projetos'],
+        disciplinas: result['disciplinas'],
+      );
+
+      if (simulacao != null) {
+        // Identificar perfil mais próximo
+        List<List<double>> centroides = [
+          [3, 0, 1],
+          [8, 6, 2],
+          [20, 2, 3]
+        ];
+
+        double menorDist = double.infinity;
+        int perfilMaisProximo = 0;
+
+        for (int i = 0; i < centroides.length; i++) {
+          double dist = _calcularDistanciaPerfil(
+            result['horas_estudo'],
+            result['projetos'],
+            result['disciplinas'],
+            centroides[i],
+          );
+          if (dist < menorDist) {
+            menorDist = dist;
+            perfilMaisProximo = i;
+          }
+        }
+
+        List<String> nomesPerfis = [
+          'Pouco Engajado',
+          'Altamente Prático',
+          'Estudioso Dedicado'
+        ];
+
+        setState(() {
+          scenarios.add({
+            'nome': '🎨 Personalizado ${scenarios.length + 1}',
+            'descricao': 'Próximo ao perfil: ${nomesPerfis[perfilMaisProximo]}',
+            'perfil_pesquisa': 'Cenário customizado',
+            'horas_estudo': result['horas_estudo'],
+            'projetos': result['projetos'],
+            'disciplinas': result['disciplinas'],
+            'cor': Colors.orange,
+            'insight': 'Distância do perfil: ${(menorDist * 100).toStringAsFixed(1)}%',
+            'impacto_previsto': simulacao['impacto_previsto'] ?? 3.0,
+            'risco': simulacao['risco'] ?? 'Médio',
+            'risco_percentual': _getRiscoPercentual(simulacao['risco']),
+          });
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _selectScenario(int index) {
+    setState(() => selectedScenarioIndex = index);
+  }
+
+  Future<void> _applyScenario() async {
+    if (selectedScenarioIndex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione um cenário primeiro')),
+      );
+      return;
+    }
+
+    final scenario = scenarios[selectedScenarioIndex!];
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Aplicação'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Deseja aplicar o cenário "${scenario['nome']}"?',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Text('📊 ${scenario['perfil_pesquisa']}'),
+            const SizedBox(height: 8),
+            Text('💡 ${scenario['insight']}'),
+            const SizedBox(height: 16),
+            const Text(
+              'Isto atualizará suas métricas e gerará um plano semestral.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => isLoading = true);
+
+      final success = await ApiService.atualizarDados(
+        matricula: widget.matricula,
+        horasEstudo: scenario['horas_estudo'],
+        projetos: scenario['projetos'],
+        disciplinas: scenario['disciplinas'],
+        impacto: scenario['impacto_previsto'],
+      );
+
+      setState(() => isLoading = false);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '✅ Cenário "${scenario['nome']}" aplicado com sucesso!',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        Navigator.pop(context, scenario);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Erro ao aplicar cenário'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Comparador de Cenários'),
+        elevation: 0,
+        backgroundColor: const Color(0xFF2563EB),
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Cabeçalho com contexto da pesquisa
+                  Card(
+                    color: Colors.blue.shade50,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.science, color: Colors.blue.shade700),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Baseado em Pesquisa Real',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Dados coletados com 32 estudantes do IC-UFBA usando K-Means Clustering e Regressão Linear (R² = 26,64%)',
+                            style: TextStyle(fontSize: 12, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Compare os 3 Perfis Identificados',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Escolha o perfil que melhor se alinha aos seus objetivos',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Gráfico Comparativo
+                  Card(
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Comparação: Impacto vs Risco',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            height: 250,
+                            child: scenarios.isEmpty
+                                ? const Center(
+                                    child: Text('Carregando cenários...'))
+                                : BarChart(
+                                    BarChartData(
+                                      alignment: BarChartAlignment.spaceAround,
+                                      maxY: 100,
+                                      barGroups: List.generate(
+                                        scenarios.length,
+                                        (index) => BarChartGroupData(
+                                          x: index,
+                                          barRods: [
+                                            BarChartRodData(
+                                              toY: scenarios[index]
+                                                      ['impacto_previsto'] *
+                                                  20,
+                                              color: scenarios[index]['cor'],
+                                              width: 20,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            BarChartRodData(
+                                              toY: scenarios[index]
+                                                      ['risco_percentual']
+                                                  .toDouble(),
+                                              color: Colors.orange
+                                                  .withOpacity(0.6),
+                                              width: 20,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      titlesData: FlTitlesData(
+                                        bottomTitles: AxisTitles(
+                                          sideTitles: SideTitles(
+                                            showTitles: true,
+                                            getTitlesWidget: (value, meta) {
+                                              if (value.toInt() >=
+                                                  scenarios.length) {
+                                                return const SizedBox();
+                                              }
+                                              return Padding(
+                                                padding: const EdgeInsets.only(
+                                                    top: 8),
+                                                child: Text(
+                                                  scenarios[value.toInt()]
+                                                          ['nome']
+                                                      .toString()
+                                                      .split(' ')[0],
+                                                  style: const TextStyle(
+                                                      fontSize: 16),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        leftTitles: AxisTitles(
+                                          sideTitles:
+                                              SideTitles(showTitles: true),
+                                        ),
+                                        topTitles: AxisTitles(
+                                          sideTitles:
+                                              SideTitles(showTitles: false),
+                                        ),
+                                        rightTitles: AxisTitles(
+                                          sideTitles:
+                                              SideTitles(showTitles: false),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildLegend('Impacto', Colors.blue),
+                              const SizedBox(width: 24),
+                              _buildLegend('Risco', Colors.orange),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Cards de Cenários com insights da pesquisa
+                  ...List.generate(scenarios.length, (index) {
+                    final scenario = scenarios[index];
+                    final isSelected = selectedScenarioIndex == index;
+
+                    return GestureDetector(
+                      onTap: () => _selectScenario(index),
+                      child: Card(
+                        elevation: isSelected ? 8 : 2,
+                        color: isSelected
+                            ? scenario['cor'].withOpacity(0.1)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: isSelected
+                                ? scenario['cor']
+                                : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          scenario['cor'].withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        scenario['nome']
+                                            .toString()
+                                            .split(' ')[0],
+                                        style: const TextStyle(fontSize: 24),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          scenario['nome'],
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          scenario['descricao'],
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        if (scenario['percentual_turma'] !=
+                                            null)
+                                          Container(
+                                            margin: const EdgeInsets.only(top: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: scenario['cor']
+                                                  .withOpacity(0.2),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              '${scenario['percentual_turma']} da turma',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: scenario['cor'],
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: scenario['cor'],
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Insight da pesquisa
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.amber.shade200,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.lightbulb,
+                                        color: Colors.amber.shade700, size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        scenario['insight'],
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.amber.shade900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Divider(height: 24),
+
+                              // Métricas
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  _buildMetric(
+                                    '${scenario['horas_estudo'].toInt()}h',
+                                    'Estudo/sem',
+                                    Icons.schedule,
+                                  ),
+                                  _buildMetric(
+                                    '${scenario['projetos']}',
+                                    'Projetos',
+                                    Icons.work,
+                                  ),
+                                  _buildMetric(
+                                    '${scenario['disciplinas']}',
+                                    'Disciplinas',
+                                    Icons.book,
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 24),
+
+                              // Resultados
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Impacto Previsto',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      Text(
+                                        scenario['impacto_previsto']
+                                            .toStringAsFixed(1),
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: scenario['cor'],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _getRiscoColor(scenario['risco'])
+                                          .withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.warning_amber,
+                                          size: 16,
+                                          color:
+                                              _getRiscoColor(scenario['risco']),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Risco ${scenario['risco']}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: _getRiscoColor(
+                                                scenario['risco']),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 16),
+
+                  // Botão Adicionar Cenário
+                  OutlinedButton.icon(
+                    onPressed: _addCustomScenario,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Criar Cenário Personalizado'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                    ),
+                  ),
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+      floatingActionButton: selectedScenarioIndex != null
+          ? FloatingActionButton.extended(
+              onPressed: _applyScenario,
+              icon: const Icon(Icons.check_circle),
+              label: const Text('Aplicar Cenário'),
+              backgroundColor: const Color(0xFF2563EB),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildLegend(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildMetric(String value, String label, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getRiscoColor(String risco) {
+    switch (risco.toLowerCase()) {
+      case 'baixo':
+        return Colors.green;
+      case 'médio':
+      case 'medio':
+        return Colors.orange;
+      case 'alto':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+}

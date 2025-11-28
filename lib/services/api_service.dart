@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Mude para o IP da sua máquina se testar em dispositivo físico
-  static const String baseUrl = 'http://127.0.0.1:5000/api';
+  static const String baseUrl = 'https://saa-29pn.onrender.com/api';
 
   // ============= AUTENTICAÇÃO =============
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:saa/dashboard_screen.dart';
+import 'package:saa/screens/dashboard_screen.dart';
 import 'package:saa/services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
