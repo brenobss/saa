@@ -16,6 +16,16 @@ def create_app() -> Flask:
     def healthcheck():
         return jsonify({"status": "ok"})
 
+    @app.route("/api", methods=["GET"])
+    def api_root():
+        # Rota simples para evitar 404 ao acessar o prefixo /api sem recurso
+        return jsonify({"status": "ok", "message": "SAA API - raiz"})
+
+    @app.route("/", methods=["GET"])
+    def root():
+        # Rota raiz para facilitar verificações via navegador
+        return jsonify({"status": "ok", "message": "SAA backend is running"})
+
     @app.route("/api/simular", methods=["POST"])
     def simular_cenario():
         payload = request.get_json(force=True, silent=True) or {}
