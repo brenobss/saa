@@ -1,0 +1,4 @@
+/*    /index.html   200
+
+# Opcional: rejeita requisições de arquivos ausentes (força fallback para index)
+#/assets/*  /index.html  200

@@ -1,0 +1,14 @@
+[build]
+  # Quando Netlify fizer build automático, use este comando
+  command = "flutter build web --release --base-href /"
+  # Diretório gerado pelo Flutter web
+  publish = "build/web"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[dev]
+  # Mantém o conteúdo estático servido corretamente em deploys de preview
+  command = "flutter run -d web-server --web-port 8080"
