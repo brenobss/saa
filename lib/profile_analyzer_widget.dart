@@ -372,6 +372,10 @@ class ProfileAnalyzerWidget extends StatelessWidget {
             ...List.generate(perfis.length, (index) {
               if (index == analise['indice']) return const SizedBox.shrink();
 
+              // Não mostra transição para "Pouco Engajado"
+              if (perfis[index]['nome'] == 'Pouco Engajado')
+                return const SizedBox.shrink();
+
               final perfilDestino = perfis[index];
               final mudanca = _calcularMudancaNecessaria(index);
 
