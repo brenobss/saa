@@ -418,10 +418,12 @@ class _ScenarioComparisonScreenState extends State<ScenarioComparisonScreen> {
                             child: scenarios.isEmpty
                                 ? const Center(
                                     child: Text('Carregando cenários...'))
-                                : BarChart(
-                                    BarChartData(
-                                      alignment: BarChartAlignment.spaceAround,
-                                      maxY: 100,
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: BarChart(
+                                      BarChartData(
+                                        alignment: BarChartAlignment.spaceAround,
+                                        maxY: 100,
                                       barGroups: List.generate(
                                         scenarios.length,
                                         (index) => BarChartGroupData(
